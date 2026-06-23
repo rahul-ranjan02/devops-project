@@ -1,26 +1,38 @@
 pipeline {
     agent any
 
+    environment {
+        IMAGE_NAME = "rahul026/devops-app"
+    }
+
     stages {
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t devops-app .'
+                sh 'docker build -t $IMAGE_NAME:latest .'
             }
         }
 
-        stage('Stop Old Container') {
+        stage('Push to DockerHub') {
             steps {
-                sh 'docker stop devops-container || true'
-                sh 'docker rm devops-container || true'
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-creds',
+                    usernameVariable: 'USER',
+                    passwordVariable: 'PASS'
+                )]) {
+                    sh '''
+                    echo $PASS | docker login -u $USER --password-stdin
+                    docker push $IMAGE_NAME:latest
+                    '''
+                }
             }
         }
 
-        stage('Run New Container') {
+        stage('Deploy to Kubernetes') {
             steps {
-                sh 'docker run -d -p 80:80 --name devops-container devops-app'
+                sh 'kubectl apply -f deployment.yaml'
+                sh 'kubectl apply -f service.yaml'
             }
         }
     }
 }
-
